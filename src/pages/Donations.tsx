@@ -122,7 +122,7 @@ const ReceiptModal = ({ donation, isOpen, onClose }: ReceiptModalProps) => {
             </div>
           </div>
 
-          {donation.items && donation.items.length > 0 && (
+          {donation.goods && donation.goods.length > 0 && (
             <div className="mt-6 border-t border-primary-200 pt-4">
               <p className="text-secondary-500 mb-2 text-sm">捐赠物资明细</p>
               <div className="bg-white rounded-lg overflow-hidden border border-primary-100">
@@ -135,23 +135,16 @@ const ReceiptModal = ({ donation, isOpen, onClose }: ReceiptModalProps) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {donation.items.map((item, index) => (
+                    {donation.goods.map((item, index) => (
                       <tr key={index} className="border-t border-secondary-100">
                         <td className="px-3 py-2 text-secondary-800">{item.name}</td>
                         <td className="px-3 py-2 text-center text-secondary-600">{item.quantity}{item.unit}</td>
-                        <td className="px-3 py-2 text-right font-medium text-secondary-800">{formatCurrency(item.estimatedValue)}</td>
+                        <td className="px-3 py-2 text-right font-medium text-secondary-800">{formatCurrency(item.estimatedValue || 0)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
-
-          {donation.message && (
-            <div className="mt-4 p-3 bg-white/50 rounded-lg border border-primary-100">
-              <p className="text-secondary-500 mb-1 text-xs">捐赠留言</p>
-              <p className="text-secondary-700 text-sm italic">"{donation.message}"</p>
             </div>
           )}
 

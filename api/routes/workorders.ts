@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getStore } from '../data/store.js';
+import { getStore, generateId } from '../data/store.js';
 import { authenticate, requireRoles, getCurrentUser } from '../middleware/auth.js';
 import type { WorkOrder, ApiResponse } from '../../shared/index.js';
 
@@ -38,7 +38,7 @@ router.post(
       return;
     }
 
-    if (workOrder.status !== 'pending') {
+    if (workOrder.status !== 'created') {
       res.status(400).json({ success: false, message: '当前状态不允许指派承运方' });
       return;
     }
@@ -152,9 +152,5 @@ router.get(
     });
   }
 );
-
-function generateId(prefix: string): string {
-  return `${prefix}${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
-}
 
 export default router;

@@ -34,34 +34,34 @@ const NewDonation = () => {
   const [amount, setAmount] = useState('');
   const [projectId, setProjectId] = useState('');
   const [message, setMessage] = useState('');
-  const [items, setItems] = useState<DonationItemCreate[]>([
-    { name: '', category: 'food', quantity: 1, unit: '件', estimatedValue: 0, condition: 'new' }
+  const [goods, setGoods] = useState<DonationItemCreate[]>([
+    { name: '', quantity: 1, unit: '件', estimatedValue: 0 }
   ]);
   const [loading, setLoading] = useState(false);
   const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [newDonation, setNewDonation] = useState<Donation | null>(null);
 
   const addItem = () => {
-    setItems([...items, { name: '', category: 'food', quantity: 1, unit: '件', estimatedValue: 0, condition: 'new' }]);
+    setGoods([...goods, { name: '', quantity: 1, unit: '件', estimatedValue: 0 }]);
   };
 
   const removeItem = (index: number) => {
-    if (items.length > 1) {
-      setItems(items.filter((_, i) => i !== index));
+    if (goods.length > 1) {
+      setGoods(goods.filter((_, i) => i !== index));
     }
   };
 
   const updateItem = (index: number, field: keyof DonationItemCreate, value: any) => {
-    const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setItems(newItems);
+    const newGoods = [...goods];
+    newGoods[index] = { ...newGoods[index], [field]: value };
+    setGoods(newGoods);
   };
 
   const calculateTotal = () => {
     if (type === 'money') {
       return parseFloat(amount) || 0;
     }
-    return items.reduce((sum, item) => sum + (item.estimatedValue || 0), 0);
+    return goods.reduce((sum, item) => sum + (item.estimatedValue || 0), 0);
   };
 
   const formatCurrency = (amount: number) => `¥${amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
@@ -76,8 +76,7 @@ const NewDonation = () => {
       type,
       totalValue,
       projectId: projectId || undefined,
-      message: message || undefined,
-      ...(type === 'money' ? { amount: parseFloat(amount) } : { items }),
+      ...(type === 'money' ? { amount: parseFloat(amount) } : { goods }),
     };
 
     const response = await api.post<Donation>('/donations', donationData);
@@ -200,12 +199,12 @@ const NewDonation = () => {
               </div>
               
               <div className="space-y-4">
-                {items.map((item, index) => (
+                {goods.map((item, index) => (
                   <Card key={index} className="border-dashed">
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-3">
                         <span className="text-sm font-medium text-secondary-600">物资 {index + 1}</span>
-                        {items.length > 1 && (
+                        {goods.length > 1 && (
                           <button
                             type="button"
                             onClick={() => removeItem(index)}
@@ -215,8 +214,8 @@ const NewDonation = () => {
                           </button>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="col-span-2">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="col-span-3">
                           <Input
                             label="物资名称"
                             value={item.name}
@@ -226,32 +225,23 @@ const NewDonation = () => {
                           />
                         </div>
                         <div>
-                          <Select
-                            label="类别"
-                            value={item.category}
-                            onChange={(e) => updateItem(index, 'category', e.target.value)}
-                            options={categoryOptions}
+                          <Input
+                            label="数量"
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
                             required
                           />
                         </div>
                         <div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <Input
-                              label="数量"
-                              type="number"
-                              min="1"
-                              value={item.quantity}
-                              onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                              required
-                            />
-                            <Input
-                              label="单位"
-                              value={item.unit}
-                              onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                              placeholder="件/箱/个"
-                              required
-                            />
-                          </div>
+                          <Input
+                            label="单位"
+                            value={item.unit}
+                            onChange={(e) => updateItem(index, 'unit', e.target.value)}
+                            placeholder="件/箱/个"
+                            required
+                          />
                         </div>
                         <div>
                           <Input
@@ -261,19 +251,6 @@ const NewDonation = () => {
                             step="0.01"
                             value={item.estimatedValue}
                             onChange={(e) => updateItem(index, 'estimatedValue', parseFloat(e.target.value) || 0)}
-                            required
-                          />
-                        </div>
-                        <div>
-                          <Select
-                            label="新旧程度"
-                            value={item.condition}
-                            onChange={(e) => updateItem(index, 'condition', e.target.value as 'new' | 'good' | 'used')}
-                            options={[
-                              { value: 'new', label: '全新' },
-                              { value: 'good', label: '九成新' },
-                              { value: 'used', label: '可正常使用' },
-                            ]}
                             required
                           />
                         </div>

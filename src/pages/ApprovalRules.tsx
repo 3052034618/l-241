@@ -71,9 +71,9 @@ const ApprovalRules = () => {
     if (type) params.append('type', type);
     if (status) params.append('status', status);
 
-    const response = await api.get<{ rules: ApprovalRule[] }>(`/approval-rules?${params.toString()}`);
+    const response = await api.get<ApprovalRule[]>(`/approval-rules?${params.toString()}`);
     if (response.success && response.data) {
-      setRules(response.data.rules);
+      setRules(response.data);
     }
     setLoading(false);
   };
@@ -85,15 +85,15 @@ const ApprovalRules = () => {
   const handleAdd = () => {
     setIsNewRule(true);
     setEditingRule({
-      name: '',
-      type: 'procurement',
+      ruleName: '',
+      ruleType: 'procurement',
       description: '',
       minAmount: 0,
       maxAmount: 999999,
-      level1Role: 'inventory_admin',
-      level2Role: 'foundation_admin',
-      requireAll: true,
-      status: 'active',
+      firstLevelApproverRole: 'inventory_admin',
+      secondLevelApproverRole: 'foundation_admin',
+      signType: 'all',
+      enabled: true,
     });
     setEditModalOpen(true);
   };
@@ -105,8 +105,8 @@ const ApprovalRules = () => {
   };
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    const response = await api.put(`/approval-rules/${id}`, { status: newStatus });
+    const newEnabled = currentStatus !== 'active';
+    const response = await api.put(`/approval-rules/${id}`, { enabled: newEnabled });
     if (response.success) {
       fetchRules();
     }
@@ -140,7 +140,7 @@ const ApprovalRules = () => {
     setSubmitting(false);
   };
 
-  const activeCount = rules.filter(r => r.status === 'active').length;
+  const activeCount = rules.filter(r => r.enabled).length;
 
   return (
     <div className="space-y-6">
@@ -169,7 +169,7 @@ const ApprovalRules = () => {
               <div>
                 <p className="text-sm text-secondary-500">采购审批规则</p>
                 <p className="text-2xl font-bold text-primary-600 font-serif">
-                  {rules.filter(r => r.type === 'procurement').length}
+                  {rules.filter(r => r.ruleType === 'procurement').length}
                 </p>
               </div>
             </div>
@@ -184,7 +184,7 @@ const ApprovalRules = () => {
               <div>
                 <p className="text-sm text-secondary-500">受助审批规则</p>
                 <p className="text-2xl font-bold text-info-600 font-serif">
-                  {rules.filter(r => r.type === 'assistance').length}
+                  {rules.filter(r => r.ruleType === 'assistance').length}
                 </p>
               </div>
             </div>
@@ -279,41 +279,41 @@ const ApprovalRules = () => {
                   <TableRow key={rule.id}>
                     <TableCell>
                       <div>
-                        <p className="font-medium text-secondary-800">{rule.name}</p>
+                        <p className="font-medium text-secondary-800">{rule.ruleName}</p>
                         <p className="text-xs text-secondary-400">{rule.description}</p>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={typeColors[rule.type]}>
-                        {typeLabels[rule.type]}
+                      <Badge className={typeColors[rule.ruleType]}>
+                        {typeLabels[rule.ruleType]}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-secondary-600">
-                      ¥{rule.minAmount.toLocaleString()} - ¥{rule.maxAmount.toLocaleString()}
+                      ¥{rule.minAmount?.toLocaleString() || 0} - ¥{rule.maxAmount?.toLocaleString() || 0}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{roleLabels[rule.level1Role]}</Badge>
+                      <Badge variant="secondary">{roleLabels[rule.firstLevelApproverRole]}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{roleLabels[rule.level2Role]}</Badge>
+                      <Badge variant="secondary">{roleLabels[rule.secondLevelApproverRole]}</Badge>
                     </TableCell>
                     <TableCell className="text-secondary-600">
-                      {rule.requireAll ? '全员会签' : '或签（任一即可）'}
+                      {rule.signType === 'all' ? '全员会签' : '或签（任一即可）'}
                     </TableCell>
                     <TableCell>
                       <button
-                        onClick={() => canEdit && handleToggleStatus(rule.id, rule.status)}
+                        onClick={() => canEdit && handleToggleStatus(rule.id, rule.enabled ? 'active' : 'inactive')}
                         className={cn(
                           'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors',
-                          rule.status === 'active'
+                          rule.enabled
                             ? 'bg-success-100 text-success-700 hover:bg-success-200'
                             : 'bg-secondary-100 text-secondary-600 hover:bg-secondary-200',
                           !canEdit && 'cursor-not-allowed opacity-70'
                         )}
                         disabled={!canEdit}
                       >
-                        {rule.status === 'active' ? <Check size={12} className="mr-1" /> : <X size={12} className="mr-1" />}
-                        {rule.status === 'active' ? '启用' : '禁用'}
+                        {rule.enabled ? <Check size={12} className="mr-1" /> : <X size={12} className="mr-1" />}
+                        {rule.enabled ? '启用' : '禁用'}
                       </button>
                     </TableCell>
                     <TableCell className="text-right space-x-1">
@@ -360,8 +360,8 @@ const ApprovalRules = () => {
               <div className="col-span-2">
                 <Input
                   label="规则名称"
-                  value={editingRule.name}
-                  onChange={(e) => setEditingRule({ ...editingRule, name: e.target.value })}
+                  value={editingRule.ruleName}
+                  onChange={(e) => setEditingRule({ ...editingRule, ruleName: e.target.value })}
                   placeholder="请输入规则名称"
                   required
                 />
@@ -369,8 +369,8 @@ const ApprovalRules = () => {
               <div>
                 <Select
                   label="规则类型"
-                  value={editingRule.type}
-                  onChange={(e) => setEditingRule({ ...editingRule, type: e.target.value as any })}
+                  value={editingRule.ruleType}
+                  onChange={(e) => setEditingRule({ ...editingRule, ruleType: e.target.value as any })}
                   options={typeOptions.filter(o => o.value)}
                   required
                 />
@@ -406,8 +406,8 @@ const ApprovalRules = () => {
               <div>
                 <Select
                   label="一级审批角色"
-                  value={editingRule.level1Role}
-                  onChange={(e) => setEditingRule({ ...editingRule, level1Role: e.target.value as any })}
+                  value={editingRule.firstLevelApproverRole}
+                  onChange={(e) => setEditingRule({ ...editingRule, firstLevelApproverRole: e.target.value as any })}
                   options={[
                     { value: 'inventory_admin', label: '物资管理员' },
                     { value: 'project_admin', label: '项目管理员' },
@@ -419,8 +419,8 @@ const ApprovalRules = () => {
               <div>
                 <Select
                   label="二级审批角色"
-                  value={editingRule.level2Role}
-                  onChange={(e) => setEditingRule({ ...editingRule, level2Role: e.target.value as any })}
+                  value={editingRule.secondLevelApproverRole}
+                  onChange={(e) => setEditingRule({ ...editingRule, secondLevelApproverRole: e.target.value as any })}
                   options={[
                     { value: 'project_admin', label: '项目管理员' },
                     { value: 'foundation_admin', label: '基金会负责人' },
@@ -436,9 +436,9 @@ const ApprovalRules = () => {
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="radio"
-                      name="requireAll"
-                      checked={editingRule.requireAll === true}
-                      onChange={() => setEditingRule({ ...editingRule, requireAll: true })}
+                      name="signType"
+                      checked={editingRule.signType === 'all'}
+                      onChange={() => setEditingRule({ ...editingRule, signType: 'all' })}
                       className="text-primary-500"
                     />
                     <span className="text-sm text-secondary-700">全员会签（需所有审批人同意）</span>
@@ -446,9 +446,9 @@ const ApprovalRules = () => {
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="radio"
-                      name="requireAll"
-                      checked={editingRule.requireAll === false}
-                      onChange={() => setEditingRule({ ...editingRule, requireAll: false })}
+                      name="signType"
+                      checked={editingRule.signType === 'any'}
+                      onChange={() => setEditingRule({ ...editingRule, signType: 'any' })}
                       className="text-primary-500"
                     />
                     <span className="text-sm text-secondary-700">或签（任一审批人同意即可）</span>

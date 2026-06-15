@@ -19,12 +19,12 @@ router.get(
       applications = applications.filter(a => a.status === status);
     }
     if (urgencyLevel) {
-      applications = applications.filter(a => a.urgency === urgencyLevel);
+      applications = applications.filter(a => a.urgencyLevel === urgencyLevel);
     }
 
     applications.sort((a, b) => {
-      const urgencyOrder: Record<string, number> = { urgent: 0, critical: 0, high: 1, medium: 2, low: 3 };
-      const urgencyDiff = urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+      const urgencyOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+      const urgencyDiff = urgencyOrder[a.urgencyLevel] - urgencyOrder[b.urgencyLevel];
       if (urgencyDiff !== 0) return urgencyDiff;
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
@@ -67,9 +67,10 @@ router.post(
       return;
     }
 
-    const needs = application.needsDescription.toLowerCase();
-    const urgencyMultiplier: Record<string, number> = { low: 1, medium: 1.5, high: 2, critical: 3, urgent: 3 };
-    const familyMultiplier = Math.ceil(application.familyMembers.length / 2);
+    const needs = application.needs.toLowerCase();
+    const urgencyMultiplier: Record<string, number> = { low: 1, medium: 1.5, high: 2, critical: 3 };
+    const familyMultiplier = Math.ceil(application.familyMembers / 2);
+    const urgencyLevel = application.urgencyLevel as string;
 
     const recommendedPlan: MaterialPlanItem[] = [];
 
@@ -79,7 +80,7 @@ router.post(
         recommendedPlan.push({
           inventoryId: rice.id,
           name: rice.name,
-          quantity: Math.min(2 * familyMultiplier * urgencyMultiplier, rice.quantity),
+          quantity: Math.min(Math.floor(2 * familyMultiplier * urgencyMultiplier[urgencyLevel]), rice.quantity),
           unit: rice.unit,
           available: true,
         });
@@ -190,12 +191,8 @@ router.post(
       }
     }
 
-    application.recommendedPlan = {
-      items: recommendedPlan,
-      totalValue: recommendedPlan.reduce((sum, item) => sum + (item.estimatedValue || 0), 0),
-      reason: '根据申请人需求智能推荐'
-    };
-    application.status = 'pending';
+    application.recommendedPlan = recommendedPlan;
+    application.status = 'recommended';
 
     res.json({ success: true, data: { application, recommendedPlan }, message: '智能推荐方案已生成' });
   }
@@ -260,6 +257,9 @@ router.post(
     if (approved) {
       application.status = 'approved';
 
+      const items = application.recommendedPlan || [];
+      const totalValue = items.reduce((sum, item) => sum + (item.estimatedValue || item.unitPrice || 0) * item.quantity, 0);
+
       const workOrder = {
         id: generateId('wo'),
         applicationId: application.id,
@@ -267,27 +267,25 @@ router.post(
         beneficiaryName: application.applicantName,
         address: application.address,
         deliveryAddress: application.address,
-        phone: application.contactPhone,
-        contactPhone: application.contactPhone,
-        items: application.recommendedPlan?.items || [],
-        totalValue: application.recommendedPlan?.totalValue || 0,
-        status: 'created',
+        phone: application.phone,
+        contactPhone: application.phone,
+        items,
+        totalValue,
+        status: 'created' as const,
         alternativePlanActivated: false,
         createdAt: new Date().toISOString(),
       };
 
       store.workOrders.unshift(workOrder);
 
-      if (application.recommendedPlan?.items) {
-        application.recommendedPlan.items.forEach(item => {
-          const inventory = store.inventory.find(i => i.id === item.inventoryId);
-          if (inventory) {
-            inventory.quantity = Math.max(0, inventory.quantity - item.quantity);
-            inventory.totalValue = inventory.quantity * inventory.unitPrice;
-            inventory.lastUpdated = new Date().toISOString();
-          }
-        });
-      }
+      items.forEach(item => {
+        const inventory = store.inventory.find(i => i.id === item.inventoryId);
+        if (inventory) {
+          inventory.quantity = Math.max(0, inventory.quantity - item.quantity);
+          inventory.totalValue = inventory.quantity * inventory.unitPrice;
+          inventory.lastUpdated = new Date().toISOString();
+        }
+      });
     } else {
       application.status = 'rejected';
     }

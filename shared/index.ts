@@ -80,6 +80,16 @@ export interface Inventory {
   warning?: boolean;
 }
 
+export interface InventoryCreate {
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  safetyStock: number;
+  expiryDate?: string;
+  unitPrice: number;
+}
+
 export type ProcurementStatus = 'pending' | 'pending_level1' | 'pending_level2' | 'approved' | 'approved_level1' | 'approved_level2' | 'rejected' | 'budget_locked' | 'completed';
 
 export interface ProcurementRequest {
@@ -150,6 +160,12 @@ export interface Location {
   lat: number;
   lng: number;
   timestamp: string;
+}
+
+export interface LocationUpdate {
+  location: string;
+  timestamp: string;
+  status: string;
 }
 
 export interface WorkOrder {

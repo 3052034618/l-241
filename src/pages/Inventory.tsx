@@ -58,8 +58,7 @@ const Inventory = () => {
     unit: '件',
     safetyStock: 10,
     expiryDate: '',
-    estimatedValue: 0,
-    location: '',
+    unitPrice: 0,
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -96,8 +95,7 @@ const Inventory = () => {
         unit: '件',
         safetyStock: 10,
         expiryDate: '',
-        estimatedValue: 0,
-        location: '',
+        unitPrice: 0,
       });
     }
     setSubmitting(false);
@@ -118,7 +116,8 @@ const Inventory = () => {
       category: selectedItem.category,
       quantity: requiredQuantity,
       unit: selectedItem.unit,
-      estimatedCost: requiredQuantity * (selectedItem.estimatedValue || 10),
+      estimatedPrice: selectedItem.unitPrice || 10,
+      totalAmount: requiredQuantity * (selectedItem.unitPrice || 10),
       reason: selectedItem.status === 'out_of_stock' 
         ? '库存不足，需补充' 
         : selectedItem.status === 'expiring'
@@ -171,7 +170,7 @@ const Inventory = () => {
           <div className="p-4">
             <p className="text-sm text-secondary-500 mb-1">库存总价值</p>
             <p className="text-2xl font-bold text-primary-600 font-serif">
-              {formatCurrency(inventory.reduce((sum, item) => sum + item.quantity * (item.estimatedValue || 0), 0))}
+              {formatCurrency(inventory.reduce((sum, item) => sum + item.totalValue, 0))}
             </p>
           </div>
         </Card>
@@ -271,7 +270,7 @@ const Inventory = () => {
                         </div>
                         <div>
                           <p className="font-medium text-secondary-800">{item.name}</p>
-                          <p className="text-xs text-secondary-400">{item.location || '未指定库位'}</p>
+                          <p className="text-xs text-secondary-400">{item.category}</p>
                         </div>
                       </div>
                     </TableCell>
@@ -290,7 +289,7 @@ const Inventory = () => {
                       {item.safetyStock}{item.unit}
                     </TableCell>
                     <TableCell className="text-right font-medium text-secondary-800">
-                      {formatCurrency(item.estimatedValue || 0)}
+                      {formatCurrency(item.totalValue)}
                     </TableCell>
                     <TableCell>
                       {item.expiryDate ? (
@@ -364,14 +363,6 @@ const Inventory = () => {
               />
             </div>
             <div>
-              <Input
-                label="存放位置"
-                value={newItem.location}
-                onChange={(e) => setNewItem({ ...newItem, location: e.target.value })}
-                placeholder="如：A区-03货架"
-              />
-            </div>
-            <div>
               <div className="grid grid-cols-2 gap-2">
                 <Input
                   label="入库数量"
@@ -402,12 +393,12 @@ const Inventory = () => {
             </div>
             <div>
               <Input
-                label="预估单价（元）"
+                label="单价（元）"
                 type="number"
                 min="0"
                 step="0.01"
-                value={newItem.estimatedValue}
-                onChange={(e) => setNewItem({ ...newItem, estimatedValue: parseFloat(e.target.value) || 0 })}
+                value={newItem.unitPrice}
+                onChange={(e) => setNewItem({ ...newItem, unitPrice: parseFloat(e.target.value) || 0 })}
                 required
               />
             </div>
@@ -465,7 +456,7 @@ const Inventory = () => {
                 <span className="font-semibold text-primary-600">
                   {formatCurrency(
                     Math.max(selectedItem.safetyStock * 2 - selectedItem.quantity, selectedItem.safetyStock)
-                    * (selectedItem.estimatedValue || 10)
+                    * (selectedItem.unitPrice || 10)
                   )}
                 </span>
               </div>

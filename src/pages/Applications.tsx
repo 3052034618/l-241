@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { FileText, Plus, Search, Filter, AlertTriangle, Check, X, Sparkles, User, MapPin, Phone, Home, Users } from 'lucide-react';
-import type { AssistanceApplication, AssistanceApplicationCreate, RecommendedPlan, WorkOrder } from '../../shared/index.js';
+import { FileText, Plus, Search, Filter, AlertTriangle, Check, X, Sparkles, MapPin, Users } from 'lucide-react';
+import type { AssistanceApplication, MaterialPlanItem, WorkOrder } from '../../shared/index.js';
 import { useAuthStore } from '../store/authStore.js';
 import api from '../utils/api.js';
 import Button from '../components/ui/Button.js';
@@ -15,14 +15,15 @@ import { cn } from '@/lib/utils.js';
 const statusOptions = [
   { value: '', label: '全部状态' },
   { value: 'pending', label: '待初审' },
-  { value: 'reviewing', label: '待复审' },
+  { value: 'recommended', label: '待初审' },
+  { value: 'first_review', label: '待复审' },
+  { value: 'second_review', label: '待复审' },
   { value: 'approved', label: '已通过' },
   { value: 'rejected', label: '已拒绝' },
-  { value: 'work_order_created', label: '已生成工单' },
 ];
 
 const urgencyOptions = [
-  { value: 'urgent', label: '紧急（24小时内）' },
+  { value: 'critical', label: '紧急（24小时内）' },
   { value: 'high', label: '高（3天内）' },
   { value: 'medium', label: '中（7天内）' },
   { value: 'low', label: '低（15天内）' },
@@ -30,41 +31,37 @@ const urgencyOptions = [
 
 const statusColors: Record<string, string> = {
   pending: 'bg-warning-100 text-warning-700',
-  reviewing: 'bg-info-100 text-info-700',
+  recommended: 'bg-warning-100 text-warning-700',
+  first_review: 'bg-info-100 text-info-700',
+  second_review: 'bg-info-100 text-info-700',
   approved: 'bg-success-100 text-success-700',
   rejected: 'bg-red-100 text-red-700',
-  work_order_created: 'bg-secondary-100 text-secondary-700',
+  escalated: 'bg-purple-100 text-purple-700',
 };
 
 const statusLabels: Record<string, string> = {
   pending: '待初审',
-  reviewing: '待复审',
+  recommended: '待初审',
+  first_review: '待复审',
+  second_review: '待复审',
   approved: '已通过',
   rejected: '已拒绝',
-  work_order_created: '已生成工单',
+  escalated: '已升级',
 };
 
 const urgencyColors: Record<string, string> = {
-  urgent: 'bg-red-100 text-red-700',
+  critical: 'bg-red-100 text-red-700',
   high: 'bg-orange-100 text-orange-700',
   medium: 'bg-warning-100 text-warning-700',
   low: 'bg-success-100 text-success-700',
 };
 
 const urgencyLabels: Record<string, string> = {
-  urgent: '紧急',
+  critical: '紧急',
   high: '高',
   medium: '中',
   low: '低',
 };
-
-const familyRelationOptions = [
-  { value: 'self', label: '本人' },
-  { value: 'spouse', label: '配偶' },
-  { value: 'parent', label: '父母' },
-  { value: 'child', label: '子女' },
-  { value: 'other', label: '其他' },
-];
 
 interface ReviewModalProps {
   application: AssistanceApplication | null;
@@ -117,12 +114,12 @@ const ReviewModal = ({ application, level, isOpen, onClose, onApprove, onReject 
             </div>
             <div>
               <p className="text-secondary-500">联系电话</p>
-              <p className="font-medium text-secondary-800">{application.contactPhone}</p>
+              <p className="font-medium text-secondary-800">{application.phone}</p>
             </div>
             <div>
               <p className="text-secondary-500">紧急程度</p>
-              <Badge className={urgencyColors[application.urgency]}>
-                {urgencyLabels[application.urgency]}
+              <Badge className={urgencyColors[application.urgencyLevel]}>
+                {urgencyLabels[application.urgencyLevel]}
               </Badge>
             </div>
             <div>
@@ -137,12 +134,12 @@ const ReviewModal = ({ application, level, isOpen, onClose, onApprove, onReject 
             </div>
             <div className="col-span-2">
               <p className="text-secondary-500">需求描述</p>
-              <p className="text-secondary-800">{application.needsDescription}</p>
+              <p className="text-secondary-800">{application.needs}</p>
             </div>
           </div>
         </div>
 
-        {application.recommendedPlan && (
+        {application.recommendedPlan && application.recommendedPlan.length > 0 && (
           <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles size={18} className="text-primary-600" />
@@ -154,15 +151,17 @@ const ReviewModal = ({ application, level, isOpen, onClose, onApprove, onReject 
                   <tr className="border-b border-secondary-100">
                     <th className="text-left py-2 text-secondary-600">物资名称</th>
                     <th className="text-center py-2 text-secondary-600">数量</th>
-                    <th className="text-right py-2 text-secondary-600">说明</th>
+                    <th className="text-right py-2 text-secondary-600">单价</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {application.recommendedPlan.items.map((item, index) => (
+                  {application.recommendedPlan.map((item, index) => (
                     <tr key={index} className="border-b border-secondary-50">
                       <td className="py-2 font-medium text-secondary-800">{item.name}</td>
                       <td className="py-2 text-center text-secondary-600">{item.quantity}{item.unit}</td>
-                      <td className="py-2 text-right text-secondary-500 text-xs">{item.reason}</td>
+                      <td className="py-2 text-right text-secondary-500 text-xs">
+                        {formatCurrency(item.unitPrice || item.estimatedValue || 0)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -170,11 +169,11 @@ const ReviewModal = ({ application, level, isOpen, onClose, onApprove, onReject 
               <div className="mt-3 pt-3 border-t border-primary-100 flex justify-between text-sm">
                 <span className="text-secondary-500">预计总价值</span>
                 <span className="font-bold text-primary-600">
-                  {formatCurrency(application.recommendedPlan.totalValue)}
+                  {formatCurrency(application.recommendedPlan.reduce((sum, item) => sum + (item.unitPrice || item.estimatedValue || 0) * item.quantity, 0))}
                 </span>
               </div>
               <p className="mt-2 text-xs text-secondary-500">
-                推荐理由：{application.recommendedPlan.reason}
+                推荐理由：根据申请人需求智能推荐
               </p>
             </div>
           </div>
@@ -247,24 +246,19 @@ const Applications = () => {
     application: AssistanceApplication | null;
     level: 'first' | 'second';
   }>({ isOpen: false, application: null, level: 'first' });
-  const [recommendedPlan, setRecommendedPlan] = useState<RecommendedPlan | null>(null);
+  const [recommendedPlan, setRecommendedPlan] = useState<MaterialPlanItem[] | null>(null);
   const [generatingPlan, setGeneratingPlan] = useState(false);
-  const [newApplication, setNewApplication] = useState<Partial<AssistanceApplicationCreate>>({
+  const [tempAppId, setTempAppId] = useState<string>('');
+  const [newApplication, setNewApplication] = useState<Partial<AssistanceApplication>>({
     applicantName: '',
-    contactPhone: '',
+    phone: '',
     address: '',
-    familySize: 1,
-    incomeLevel: 'low',
-    urgency: 'medium',
-    needsDescription: '',
-    specialNeeds: '',
-    familyMembers: [],
-  });
-  const [newFamilyMember, setNewFamilyMember] = useState({
-    name: '',
-    relation: 'self',
-    age: 0,
-    healthStatus: 'normal',
+    familyMembers: 1,
+    familyIncome: 0,
+    urgencyLevel: 'medium',
+    needs: '',
+    specialSituation: '',
+    idCard: '',
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -277,9 +271,9 @@ const Applications = () => {
     if (search) params.append('search', search);
     if (status) params.append('status', status);
 
-    const response = await api.get<{ applications: AssistanceApplication[] }>(`/applications?${params.toString()}`);
+    const response = await api.get<AssistanceApplication[]>(`/applications?${params.toString()}`);
     if (response.success && response.data) {
-      setApplications(response.data.applications);
+      setApplications(response.data);
     }
     setLoading(false);
   };
@@ -289,18 +283,16 @@ const Applications = () => {
   }, [search, status]);
 
   const generateRecommendation = async () => {
-    if (!newApplication.urgency || !newApplication.needsDescription) return;
+    if (!newApplication.urgencyLevel || !newApplication.needs) return;
     
     setGeneratingPlan(true);
-    const response = await api.post<RecommendedPlan>('/applications/recommend', {
-      urgency: newApplication.urgency,
-      needsDescription: newApplication.needsDescription,
-      familySize: newApplication.familySize,
-      incomeLevel: newApplication.incomeLevel,
-    });
+    const response = await api.post<{ application: AssistanceApplication; recommendedPlan: MaterialPlanItem[] }>(
+      `/applications/${tempAppId}/recommend`,
+      {}
+    );
     
     if (response.success && response.data) {
-      setRecommendedPlan(response.data);
+      setRecommendedPlan(response.data.recommendedPlan);
     }
     setGeneratingPlan(false);
   };
@@ -309,14 +301,11 @@ const Applications = () => {
     e.preventDefault();
     setSubmitting(true);
 
-    const submitData: AssistanceApplicationCreate = {
+    const submitData = {
       ...newApplication,
-      familySize: newApplication.familySize || 1,
-      incomeLevel: newApplication.incomeLevel || 'low',
-      urgency: newApplication.urgency || 'medium',
-      familyMembers: newApplication.familyMembers?.length ? newApplication.familyMembers : [],
-      ...(recommendedPlan && { recommendedPlan }),
-    } as AssistanceApplicationCreate;
+      familyMembers: newApplication.familyMembers || 1,
+      urgencyLevel: newApplication.urgencyLevel || 'medium',
+    };
 
     const response = await api.post<AssistanceApplication>('/applications', submitData);
     
@@ -325,51 +314,36 @@ const Applications = () => {
       fetchApplications();
       setNewApplication({
         applicantName: '',
-        contactPhone: '',
+        phone: '',
         address: '',
-        familySize: 1,
-        incomeLevel: 'low',
-        urgency: 'medium',
-        needsDescription: '',
-        specialNeeds: '',
-        familyMembers: [],
+        familyMembers: 1,
+        familyIncome: 0,
+        urgencyLevel: 'medium',
+        needs: '',
+        specialSituation: '',
+        idCard: '',
       });
       setRecommendedPlan(null);
+      setTempAppId('');
     }
     setSubmitting(false);
   };
 
   const handleReview = async (level: 'first' | 'second', id: string, comment: string, approved: boolean) => {
-    const response = await api.put(`/applications/${id}/${level}-${approved ? 'approve' : 'reject'}`, { comment });
+    const endpoint = level === 'first' ? 'first-review' : 'second-review';
+    const response = await api.post<AssistanceApplication>(`/applications/${id}/${endpoint}`, { approved, comment });
     if (response.success) {
       fetchApplications();
     }
   };
 
-  const handleCreateWorkOrder = async (id: string) => {
-    const response = await api.post<WorkOrder>(`/applications/${id}/create-work-order`);
-    if (response.success) {
-      fetchApplications();
-    }
+  const handleCreateWorkOrder = async (_id: string) => {
+    fetchApplications();
   };
 
-  const addFamilyMember = () => {
-    if (!newFamilyMember.name) return;
-    setNewApplication({
-      ...newApplication,
-      familyMembers: [...(newApplication.familyMembers || []), newFamilyMember],
-    });
-    setNewFamilyMember({ name: '', relation: 'self', age: 0, healthStatus: 'normal' });
-  };
 
-  const removeFamilyMember = (index: number) => {
-    setNewApplication({
-      ...newApplication,
-      familyMembers: newApplication.familyMembers?.filter((_, i) => i !== index),
-    });
-  };
 
-  const pendingCount = applications.filter(a => a.status === 'pending' || a.status === 'reviewing').length;
+  const pendingCount = applications.filter(a => a.status === 'pending' || a.status === 'recommended' || a.status === 'first_review').length;
   const formatCurrency = (amount: number) => `¥${amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
 
   return (
@@ -400,7 +374,7 @@ const Applications = () => {
           <div className="p-4">
             <p className="text-sm text-secondary-500 mb-1">待初审</p>
             <p className="text-2xl font-bold text-warning-600 font-serif">
-              {applications.filter(a => a.status === 'pending').length}
+              {applications.filter(a => a.status === 'pending' || a.status === 'recommended').length}
             </p>
           </div>
         </Card>
@@ -408,7 +382,7 @@ const Applications = () => {
           <div className="p-4">
             <p className="text-sm text-secondary-500 mb-1">待复审</p>
             <p className="text-2xl font-bold text-info-600 font-serif">
-              {applications.filter(a => a.status === 'reviewing').length}
+              {applications.filter(a => a.status === 'first_review' || a.status === 'second_review').length}
             </p>
           </div>
         </Card>
@@ -422,9 +396,9 @@ const Applications = () => {
         </Card>
         <Card>
           <div className="p-4">
-            <p className="text-sm text-secondary-500 mb-1">已生成工单</p>
-            <p className="text-2xl font-bold text-secondary-600 font-serif">
-              {applications.filter(a => a.status === 'work_order_created').length}
+            <p className="text-sm text-secondary-500 mb-1">已拒绝</p>
+            <p className="text-2xl font-bold text-red-600 font-serif">
+              {applications.filter(a => a.status === 'rejected').length}
             </p>
           </div>
         </Card>
@@ -489,20 +463,20 @@ const Applications = () => {
                         </div>
                         <div>
                           <p className="font-medium text-secondary-800">{app.applicantName}</p>
-                          <p className="text-xs text-secondary-400">{app.contactPhone}</p>
+                          <p className="text-xs text-secondary-400">{app.phone}</p>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={urgencyColors[app.urgency]}>
-                        {urgencyLabels[app.urgency]}
+                      <Badge className={urgencyColors[app.urgencyLevel]}>
+                        {urgencyLabels[app.urgencyLevel]}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center text-secondary-600">
-                      {app.familySize}人
+                      {app.familyMembers}人
                     </TableCell>
                     <TableCell className="text-secondary-600 max-w-xs truncate">
-                      {app.needsDescription}
+                      {app.needs}
                     </TableCell>
                     <TableCell>
                       <Badge className={statusColors[app.status]}>
@@ -513,7 +487,7 @@ const Applications = () => {
                       {new Date(app.createdAt).toLocaleDateString('zh-CN')}
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      {app.status === 'pending' && canReviewFirst && (
+                      {(app.status === 'pending' || app.status === 'recommended') && canReviewFirst && (
                         <Button
                           size="sm"
                           variant="secondary"
@@ -522,21 +496,12 @@ const Applications = () => {
                           初审
                         </Button>
                       )}
-                      {app.status === 'reviewing' && canReviewSecond && (
+                      {(app.status === 'first_review' || app.status === 'second_review') && canReviewSecond && (
                         <Button
                           size="sm"
                           onClick={() => setReviewModal({ isOpen: true, application: app, level: 'second' })}
                         >
                           复审
-                        </Button>
-                      )}
-                      {app.status === 'approved' && canReviewSecond && (
-                        <Button
-                          size="sm"
-                          variant="success"
-                          onClick={() => handleCreateWorkOrder(app.id)}
-                        >
-                          生成工单
                         </Button>
                       )}
                     </TableCell>
@@ -571,9 +536,18 @@ const Applications = () => {
             <div>
               <Input
                 label="联系电话"
-                value={newApplication.contactPhone}
-                onChange={(e) => setNewApplication({ ...newApplication, contactPhone: e.target.value })}
+                value={newApplication.phone}
+                onChange={(e) => setNewApplication({ ...newApplication, phone: e.target.value })}
                 placeholder="请输入手机号码"
+                required
+              />
+            </div>
+            <div>
+              <Input
+                label="身份证号"
+                value={newApplication.idCard}
+                onChange={(e) => setNewApplication({ ...newApplication, idCard: e.target.value })}
+                placeholder="请输入身份证号"
                 required
               />
             </div>
@@ -592,30 +566,27 @@ const Applications = () => {
                 label="家庭人口数"
                 type="number"
                 min="1"
-                value={newApplication.familySize}
-                onChange={(e) => setNewApplication({ ...newApplication, familySize: parseInt(e.target.value) || 1 })}
+                value={newApplication.familyMembers}
+                onChange={(e) => setNewApplication({ ...newApplication, familyMembers: parseInt(e.target.value) || 1 })}
                 icon={<Users size={16} className="text-secondary-400" />}
                 required
               />
             </div>
             <div>
-              <Select
-                label="收入水平"
-                value={newApplication.incomeLevel}
-                onChange={(e) => setNewApplication({ ...newApplication, incomeLevel: e.target.value })}
-                options={[
-                  { value: 'low', label: '低收入' },
-                  { value: 'medium', label: '中等收入' },
-                  { value: 'poverty', label: '贫困' },
-                ]}
+              <Input
+                label="家庭月收入"
+                type="number"
+                min="0"
+                value={newApplication.familyIncome}
+                onChange={(e) => setNewApplication({ ...newApplication, familyIncome: parseInt(e.target.value) || 0 })}
                 required
               />
             </div>
             <div>
               <Select
                 label="紧急程度"
-                value={newApplication.urgency}
-                onChange={(e) => setNewApplication({ ...newApplication, urgency: e.target.value as any })}
+                value={newApplication.urgencyLevel}
+                onChange={(e) => setNewApplication({ ...newApplication, urgencyLevel: e.target.value as any })}
                 options={urgencyOptions}
                 required
               />
@@ -624,64 +595,11 @@ const Applications = () => {
 
           <div>
             <label className="block text-sm font-medium text-secondary-700 mb-2">
-              家庭成员
-            </label>
-            <div className="space-y-2 mb-3">
-              {newApplication.familyMembers?.map((member, index) => (
-                <div key={index} className="flex items-center gap-2 p-2 bg-secondary-50 rounded-lg">
-                  <User size={16} className="text-secondary-400" />
-                  <span className="text-sm text-secondary-700">
-                    {member.name} ({familyRelationOptions.find(o => o.value === member.relation)?.label})，{member.age}岁
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeFamilyMember(index)}
-                    className="ml-auto text-red-500 hover:text-red-600"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              <Input
-                placeholder="姓名"
-                value={newFamilyMember.name}
-                onChange={(e) => setNewFamilyMember({ ...newFamilyMember, name: e.target.value })}
-                className="col-span-1"
-              />
-              <Select
-                value={newFamilyMember.relation}
-                onChange={(e) => setNewFamilyMember({ ...newFamilyMember, relation: e.target.value })}
-                options={familyRelationOptions}
-                className="col-span-1"
-              />
-              <Input
-                type="number"
-                placeholder="年龄"
-                value={newFamilyMember.age}
-                onChange={(e) => setNewFamilyMember({ ...newFamilyMember, age: parseInt(e.target.value) || 0 })}
-                className="col-span-1"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={addFamilyMember}
-                className="col-span-1 h-[42px]"
-              >
-                <Plus size={16} className="mr-1" />
-                添加
-              </Button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-secondary-700 mb-2">
               需求描述
             </label>
             <textarea
-              value={newApplication.needsDescription}
-              onChange={(e) => setNewApplication({ ...newApplication, needsDescription: e.target.value })}
+              value={newApplication.needs}
+              onChange={(e) => setNewApplication({ ...newApplication, needs: e.target.value })}
               placeholder="请详细描述家庭困难情况和具体需求..."
               className="w-full px-4 py-3 rounded-lg border border-secondary-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all resize-none"
               rows={3}
@@ -691,9 +609,9 @@ const Applications = () => {
 
           <div>
             <Input
-              label="特殊需求（可选）"
-              value={newApplication.specialNeeds}
-              onChange={(e) => setNewApplication({ ...newApplication, specialNeeds: e.target.value })}
+              label="特殊情况（可选）"
+              value={newApplication.specialSituation}
+              onChange={(e) => setNewApplication({ ...newApplication, specialSituation: e.target.value })}
               placeholder="如：过敏史、慢性病、行动不便等"
             />
           </div>
@@ -704,13 +622,13 @@ const Applications = () => {
             className="w-full"
             onClick={generateRecommendation}
             loading={generatingPlan}
-            disabled={!newApplication.urgency || !newApplication.needsDescription}
+            disabled={!newApplication.urgencyLevel || !newApplication.needs || !tempAppId}
           >
             <Sparkles size={16} className="mr-1" />
-            智能推荐物资方案
+            智能推荐物资方案（请先保存草稿）
           </Button>
 
-          {recommendedPlan && (
+          {recommendedPlan && recommendedPlan.length > 0 && (
             <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -725,15 +643,17 @@ const Applications = () => {
                     <tr className="border-b border-secondary-100">
                       <th className="text-left py-2 text-secondary-600">物资名称</th>
                       <th className="text-center py-2 text-secondary-600">数量</th>
-                      <th className="text-right py-2 text-secondary-600">说明</th>
+                      <th className="text-right py-2 text-secondary-600">单价</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {recommendedPlan.items.map((item, index) => (
+                    {recommendedPlan.map((item, index) => (
                       <tr key={index} className="border-b border-secondary-50">
                         <td className="py-2 font-medium text-secondary-800">{item.name}</td>
                         <td className="py-2 text-center text-secondary-600">{item.quantity}{item.unit}</td>
-                        <td className="py-2 text-right text-secondary-500 text-xs">{item.reason}</td>
+                        <td className="py-2 text-right text-secondary-500 text-xs">
+                          {formatCurrency(item.unitPrice || item.estimatedValue || 0)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -741,11 +661,11 @@ const Applications = () => {
                 <div className="mt-3 pt-3 border-t border-primary-100 flex justify-between text-sm">
                   <span className="text-secondary-500">预计总价值</span>
                   <span className="font-bold text-primary-600">
-                    {formatCurrency(recommendedPlan.totalValue)}
+                    {formatCurrency(recommendedPlan.reduce((sum, item) => sum + (item.unitPrice || item.estimatedValue || 0) * item.quantity, 0))}
                   </span>
                 </div>
                 <p className="mt-2 text-xs text-secondary-500">
-                  推荐理由：{recommendedPlan.reason}
+                  推荐理由：根据申请人需求智能推荐
                 </p>
               </div>
             </div>

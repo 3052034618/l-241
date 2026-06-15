@@ -67,9 +67,9 @@ router.post(
       return;
     }
 
-    const needs = application.needs.toLowerCase();
+    const needs = (application.needs || '').toLowerCase();
     const urgencyMultiplier: Record<string, number> = { low: 1, medium: 1.5, high: 2, critical: 3 };
-    const familyMultiplier = Math.ceil(application.familyMembers / 2);
+    const familyMultiplier = Math.ceil((application.familyMembers || 1) / 2);
     const urgencyLevel = application.urgencyLevel as string;
 
     const recommendedPlan: MaterialPlanItem[] = [];
@@ -212,7 +212,7 @@ router.post(
       return;
     }
 
-    if (application.status !== 'recommended' && application.status !== 'first_review') {
+    if (application.status !== 'pending' && application.status !== 'recommended') {
       res.status(400).json({ success: false, message: '当前状态不允许初审' });
       return;
     }

@@ -13,10 +13,10 @@ import Modal from '../components/ui/Modal.js';
 
 const projectOptions = [
   { value: '', label: '不指定项目（平台统筹分配）' },
-  { value: 'proj_001', label: '阳光助学计划 - 教育' },
-  { value: 'proj_002', label: '温暖过冬行动 - 助困' },
-  { value: 'proj_003', label: '地震灾区援助 - 救灾' },
-  { value: 'proj_004', label: '大病医疗救助 - 医疗' },
+  { value: 'proj1', label: '希望小学助学计划 - 教育' },
+  { value: 'proj2', label: '困难家庭温暖包 - 助困' },
+  { value: 'proj3', label: '灾区重建基金 - 救灾' },
+  { value: 'proj4', label: '重病医疗救助 - 医疗' },
 ];
 
 const categoryOptions = [

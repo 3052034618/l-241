@@ -19,7 +19,7 @@ router.get(
       users = users.filter(u => u.role === role);
     }
 
-    res.json({ success: true, data: users });
+    res.json({ success: true, data: { users } });
   }
 );
 

@@ -11,53 +11,68 @@ router.get(
   requireRoles(['inventory_admin', 'foundation_admin']),
   (req: Request, res: Response) => {
     const store = getStore();
-    const { status } = req.query;
+    const { status, search } = req.query;
 
     let requests = [...store.procurementRequests];
 
     if (status) {
       requests = requests.filter(r => r.status === status);
     }
+    if (search) {
+      const q = String(search).toLowerCase();
+      requests = requests.filter(r =>
+        r.inventoryName.toLowerCase().includes(q) ||
+        r.id.toLowerCase().includes(q)
+      );
+    }
 
     requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    res.json({ success: true, data: requests });
+    res.json({ success: true, data: { requests } });
   }
 );
 
 router.post(
-  '/:id/approve-level1',
+  '/',
   authenticate,
   requireRoles(['inventory_admin', 'foundation_admin']),
-  (req: Request<{ id: string }, ApiResponse<ProcurementRequest>, { comment?: string }>, res: Response) => {
+  (req: Request<never, ApiResponse<ProcurementRequest>, { inventoryId: string; itemName: string; category: string; quantity: number; unit: string; estimatedPrice: number; totalAmount: number; reason: string }>, res: Response) => {
     const store = getStore();
     const user = getCurrentUser(req)!;
-    const request = store.procurementRequests.find(r => r.id === req.params.id);
+    const { inventoryId, itemName, category, quantity, unit, estimatedPrice, totalAmount, reason } = req.body;
 
-    if (!request) {
-      res.status(404).json({ success: false, message: '采购申请不存在' });
-      return;
-    }
+    const inventoryItem = store.inventory.find(i => i.id === inventoryId);
 
-    if (request.status !== 'pending') {
-      res.status(400).json({ success: false, message: '当前状态不允许一级审批' });
-      return;
-    }
+    const newRequest: ProcurementRequest = {
+      id: generateId('proc'),
+      inventoryId,
+      inventoryName: inventoryItem?.name || itemName,
+      itemName,
+      category,
+      requestedQuantity: quantity,
+      quantity,
+      unit,
+      estimatedPrice,
+      estimatedCost: totalAmount,
+      totalAmount,
+      reason,
+      createdByName: user.name,
+      status: 'pending_level1',
+      budgetLocked: false,
+      createdAt: new Date().toISOString(),
+    };
 
-    request.status = 'approved_level1';
-    request.level1Approver = user.name;
-    request.level1ApprovalTime = new Date().toISOString();
-    request.level1Comment = req.body.comment || '同意采购';
+    store.procurementRequests.unshift(newRequest);
 
-    res.json({ success: true, data: request, message: '一级审批通过' });
+    res.json({ success: true, data: newRequest, message: '采购申请已提交' });
   }
 );
 
-router.post(
-  '/:id/approve-level2',
+router.put(
+  '/:id/approve',
   authenticate,
-  requireRoles(['foundation_admin']),
-  (req: Request<{ id: string }, ApiResponse<ProcurementRequest>, { comment?: string }>, res: Response) => {
+  requireRoles(['inventory_admin', 'foundation_admin']),
+  (req: Request<{ id: string }, ApiResponse<ProcurementRequest>, { level: 1 | 2; comment?: string }>, res: Response) => {
     const store = getStore();
     const user = getCurrentUser(req)!;
     const request = store.procurementRequests.find(r => r.id === req.params.id);
@@ -67,27 +82,42 @@ router.post(
       return;
     }
 
-    if (request.status !== 'approved_level1') {
-      res.status(400).json({ success: false, message: '当前状态不允许二级审批' });
-      return;
+    const { level, comment } = req.body;
+
+    if (level === 1) {
+      if (request.status !== 'pending_level1') {
+        res.status(400).json({ success: false, message: '当前状态不允许一级审批' });
+        return;
+      }
+      request.status = 'pending_level2';
+      request.level1Approver = user.name;
+      request.level1ApprovalTime = new Date().toISOString();
+      request.level1Comment = comment || '同意采购';
+    } else if (level === 2) {
+      if (request.status === 'pending_level2') {
+        request.status = 'approved';
+        request.level2Approver = user.name;
+        request.level2ApprovalTime = new Date().toISOString();
+        request.level2Comment = comment || '同意采购';
+      } else if (request.status === 'approved') {
+        request.status = 'budget_locked';
+        request.budgetLocked = true;
+        request.level2Comment = comment || '预算已锁定';
+      } else {
+        res.status(400).json({ success: false, message: '当前状态不允许二级审批' });
+        return;
+      }
     }
 
-    request.status = 'approved_level2';
-    request.level2Approver = user.name;
-    request.level2ApprovalTime = new Date().toISOString();
-    request.level2Comment = req.body.comment || '同意采购';
-    request.budgetLocked = true;
-    request.status = 'budget_locked';
-
-    res.json({ success: true, data: request, message: '二级审批通过，预算已锁定' });
+    res.json({ success: true, data: request, message: level === 1 ? '一级审批通过' : '二级审批通过' });
   }
 );
 
-router.post(
+router.put(
   '/:id/reject',
   authenticate,
   requireRoles(['inventory_admin', 'foundation_admin']),
-  (req: Request<{ id: string }, ApiResponse<ProcurementRequest>, { comment?: string }>, res: Response) => {
+  (req: Request<{ id: string }, ApiResponse<ProcurementRequest>, { level: 1 | 2; comment?: string }>, res: Response) => {
     const store = getStore();
     const user = getCurrentUser(req)!;
     const request = store.procurementRequests.find(r => r.id === req.params.id);
@@ -102,18 +132,21 @@ router.post(
       return;
     }
 
-    const originalStatus = request.status;
+    const { level, comment } = req.body;
+    const rejectReason = comment || '拒绝采购';
+
     request.status = 'rejected';
-    if (originalStatus === 'pending_level1') {
+    request.rejectComment = rejectReason;
+
+    if (level === 1) {
       request.level1Approver = user.name;
       request.level1ApprovalTime = new Date().toISOString();
-      request.level1Comment = req.body.comment || '拒绝采购';
+      request.level1Comment = rejectReason;
     } else {
       request.level2Approver = user.name;
       request.level2ApprovalTime = new Date().toISOString();
-      request.level2Comment = req.body.comment || '拒绝采购';
+      request.level2Comment = rejectReason;
     }
-    request.rejectComment = req.body.comment || '拒绝采购';
 
     res.json({ success: true, data: request, message: '采购申请已拒绝' });
   }

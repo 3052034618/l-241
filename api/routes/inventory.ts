@@ -23,10 +23,14 @@ router.get(
   requireRoles(['inventory_admin', 'foundation_admin']),
   (req: Request, res: Response) => {
     const store = getStore();
-    const { status, category } = req.query;
+    const { search, status, category } = req.query;
 
     let inventory = [...store.inventory];
 
+    if (search) {
+      const q = String(search).toLowerCase();
+      inventory = inventory.filter(i => i.name.toLowerCase().includes(q));
+    }
     if (status) {
       inventory = inventory.filter(i => i.status === status);
     }
@@ -34,7 +38,7 @@ router.get(
       inventory = inventory.filter(i => i.category === category);
     }
 
-    res.json({ success: true, data: inventory });
+    res.json({ success: true, data: { inventory } });
   }
 );
 

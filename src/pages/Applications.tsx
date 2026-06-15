@@ -309,7 +309,19 @@ const Applications = () => {
 
     const response = await api.post<AssistanceApplication>('/applications', submitData);
     
-    if (response.success) {
+    if (response.success && response.data) {
+      const appId = response.data.id;
+      setTempAppId(appId);
+
+      const recommendResponse = await api.post<{ application: AssistanceApplication; recommendedPlan: MaterialPlanItem[] }>(
+        `/applications/${appId}/recommend`,
+        {}
+      );
+      
+      if (recommendResponse.success && recommendResponse.data) {
+        setRecommendedPlan(recommendResponse.data.recommendedPlan);
+      }
+
       setAddModalOpen(false);
       fetchApplications();
       setNewApplication({

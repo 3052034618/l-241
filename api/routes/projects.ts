@@ -32,7 +32,7 @@ router.get(
 
     projects.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    res.json({ success: true, data: projects });
+    res.json({ success: true, data: { projects } });
   }
 );
 

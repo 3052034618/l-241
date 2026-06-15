@@ -13,11 +13,12 @@ import { cn } from '@/lib/utils.js';
 
 const categoryOptions = [
   { value: '', label: '全部类别' },
-  { value: 'food', label: '食品' },
-  { value: 'clothing', label: '衣物' },
-  { value: 'medical', label: '医疗用品' },
-  { value: 'daily', label: '生活用品' },
-  { value: 'other', label: '其他' },
+  { value: '食品', label: '食品' },
+  { value: '服装', label: '服装' },
+  { value: '医疗', label: '医疗用品' },
+  { value: '日用品', label: '生活用品' },
+  { value: '学习用品', label: '学习用品' },
+  { value: '其他', label: '其他' },
 ];
 
 const statusColors: Record<string, string> = {
@@ -35,11 +36,12 @@ const statusLabels: Record<string, string> = {
 };
 
 const categoryLabels: Record<string, string> = {
-  food: '食品',
-  clothing: '衣物',
-  medical: '医疗用品',
-  daily: '生活用品',
-  other: '其他',
+  '食品': '食品',
+  '服装': '服装',
+  '医疗': '医疗用品',
+  '日用品': '生活用品',
+  '学习用品': '学习用品',
+  '其他': '其他',
 };
 
 const Inventory = () => {
@@ -53,7 +55,7 @@ const Inventory = () => {
   const [selectedItem, setSelectedItem] = useState<Inventory | null>(null);
   const [newItem, setNewItem] = useState<Partial<InventoryCreate>>({
     name: '',
-    category: 'food',
+    category: '食品',
     quantity: 0,
     unit: '件',
     safetyStock: 10,
@@ -90,7 +92,7 @@ const Inventory = () => {
       fetchInventory();
       setNewItem({
         name: '',
-        category: 'food',
+        category: '食品',
         quantity: 0,
         unit: '件',
         safetyStock: 10,
@@ -289,7 +291,7 @@ const Inventory = () => {
                       {item.safetyStock}{item.unit}
                     </TableCell>
                     <TableCell className="text-right font-medium text-secondary-800">
-                      {formatCurrency(item.totalValue)}
+                      {formatCurrency(item.unitPrice)}
                     </TableCell>
                     <TableCell>
                       {item.expiryDate ? (

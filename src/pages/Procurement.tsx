@@ -38,11 +38,12 @@ const statusLabels: Record<string, string> = {
 };
 
 const categoryLabels: Record<string, string> = {
-  food: '食品',
-  clothing: '衣物',
-  medical: '医疗用品',
-  daily: '生活用品',
-  other: '其他',
+  '食品': '食品',
+  '服装': '服装',
+  '医疗': '医疗用品',
+  '日用品': '生活用品',
+  '学习用品': '学习用品',
+  '其他': '其他',
 };
 
 interface ApproveModalProps {

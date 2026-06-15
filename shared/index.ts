@@ -166,6 +166,8 @@ export interface LocationUpdate {
   location: string;
   timestamp: string;
   status: string;
+  lat: number;
+  lng: number;
 }
 
 export interface WorkOrder {

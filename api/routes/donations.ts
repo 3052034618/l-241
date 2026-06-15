@@ -15,9 +15,28 @@ router.get('/', authenticate, (req: Request, res: Response) => {
     donations = donations.filter(d => d.donorId === user.id);
   }
 
+  const { search, type, status } = req.query;
+
+  if (search) {
+    const q = String(search).toLowerCase();
+    donations = donations.filter(d =>
+      d.donorName.toLowerCase().includes(q) ||
+      d.receiptNo.toLowerCase().includes(q) ||
+      (d.projectName && d.projectName.toLowerCase().includes(q))
+    );
+  }
+  if (type) {
+    donations = donations.filter(d => d.type === type);
+  }
+  if (status) {
+    donations = donations.filter(d => d.status === status);
+  }
+
   donations.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  res.json({ success: true, data: donations });
+  const total = donations.length;
+
+  res.json({ success: true, data: { donations, total } });
 });
 
 router.get('/:id', authenticate, (req: Request<{ id: string }>, res: Response) => {

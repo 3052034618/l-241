@@ -181,7 +181,7 @@ export const initialDonations: Donation[] = [
     projectId: 'proj1',
     projectName: '希望小学助学计划',
     receiptNo: 'CS202606010001',
-    status: 'completed',
+    status: 'approved',
     createdAt: '2026-06-01T10:30:00Z',
   },
   {
@@ -197,7 +197,7 @@ export const initialDonations: Donation[] = [
     projectId: 'proj2',
     projectName: '困难家庭温暖包',
     receiptNo: 'CS202606050002',
-    status: 'completed',
+    status: 'approved',
     createdAt: '2026-06-05T14:20:00Z',
   },
   {
@@ -210,7 +210,7 @@ export const initialDonations: Donation[] = [
     projectId: 'proj3',
     projectName: '灾区重建基金',
     receiptNo: 'CS202606100003',
-    status: 'completed',
+    status: 'pending',
     createdAt: '2026-06-10T09:15:00Z',
   },
   {
@@ -225,7 +225,7 @@ export const initialDonations: Donation[] = [
     projectId: 'proj1',
     projectName: '希望小学助学计划',
     receiptNo: 'CS202606120004',
-    status: 'completed',
+    status: 'rejected',
     createdAt: '2026-06-12T16:45:00Z',
   },
   {
@@ -238,7 +238,7 @@ export const initialDonations: Donation[] = [
     projectId: 'proj4',
     projectName: '重病医疗救助',
     receiptNo: 'CS202606140005',
-    status: 'completed',
+    status: 'approved',
     createdAt: '2026-06-14T11:00:00Z',
   },
 ];

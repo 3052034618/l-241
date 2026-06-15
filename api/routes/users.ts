@@ -11,12 +11,24 @@ router.get(
   requireRoles(['foundation_admin']),
   (req: Request, res: Response) => {
     const store = getStore();
-    const { role } = req.query;
+    const { role, status, search } = req.query;
 
     let users = [...store.users];
 
     if (role) {
       users = users.filter(u => u.role === role);
+    }
+    if (status) {
+      users = users.filter(u => u.status === status);
+    }
+    if (search) {
+      const q = String(search).toLowerCase();
+      users = users.filter(u =>
+        u.name.toLowerCase().includes(q) ||
+        u.username.toLowerCase().includes(q) ||
+        u.phone?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q)
+      );
     }
 
     res.json({ success: true, data: { users } });

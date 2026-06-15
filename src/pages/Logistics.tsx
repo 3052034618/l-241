@@ -15,19 +15,22 @@ import { cn } from '@/lib/utils.js';
 const statusOptions = [
   { value: '', label: '全部状态' },
   { value: 'assigned', label: '待接单' },
-  { value: 'accepted', label: '配送中' },
+  { value: 'accepted', label: '已接单' },
+  { value: 'in_transit', label: '配送中' },
   { value: 'delivered', label: '已送达' },
 ];
 
 const statusColors: Record<string, string> = {
   assigned: 'bg-info-100 text-info-700',
   accepted: 'bg-primary-100 text-primary-700',
+  in_transit: 'bg-primary-100 text-primary-700',
   delivered: 'bg-success-100 text-success-700',
 };
 
 const statusLabels: Record<string, string> = {
   assigned: '待接单',
-  accepted: '配送中',
+  accepted: '已接单',
+  in_transit: '配送中',
   delivered: '已送达',
 };
 
@@ -35,9 +38,10 @@ interface TrackingModalProps {
   workOrder: WorkOrder | null;
   isOpen: boolean;
   onClose: () => void;
+  onRefresh?: () => void;
 }
 
-const TrackingModal = ({ workOrder, isOpen, onClose }: TrackingModalProps) => {
+const TrackingModal = ({ workOrder, isOpen, onClose, onRefresh }: TrackingModalProps) => {
   const [locationUpdates, setLocationUpdates] = useState<LocationUpdate[]>([]);
   const [isTimeout, setIsTimeout] = useState(false);
   const [backupCarriers, setBackupCarriers] = useState<Carrier[]>([]);
@@ -85,6 +89,31 @@ const TrackingModal = ({ workOrder, isOpen, onClose }: TrackingModalProps) => {
     
     if (response.success) {
       fetchLocationUpdates();
+      onRefresh?.();
+    }
+    setLoading(false);
+  };
+
+  const handleAccept = async () => {
+    if (!workOrder) return;
+    setLoading(true);
+    
+    const response = await api.put(`/workorders/${workOrder.id}/accept`);
+    if (response.success) {
+      fetchLocationUpdates();
+      onRefresh?.();
+    }
+    setLoading(false);
+  };
+
+  const handleStartTransit = async () => {
+    if (!workOrder) return;
+    setLoading(true);
+    
+    const response = await api.put(`/workorders/${workOrder.id}/start-transit`);
+    if (response.success) {
+      fetchLocationUpdates();
+      onRefresh?.();
     }
     setLoading(false);
   };
@@ -95,7 +124,8 @@ const TrackingModal = ({ workOrder, isOpen, onClose }: TrackingModalProps) => {
     
     const response = await api.put(`/workorders/${workOrder.id}/delivered`);
     if (response.success) {
-      onClose();
+      fetchLocationUpdates();
+      onRefresh?.();
     }
     setLoading(false);
   };
@@ -116,7 +146,7 @@ const TrackingModal = ({ workOrder, isOpen, onClose }: TrackingModalProps) => {
 
   const getCurrentStepIndex = () => {
     if (workOrder.status === 'delivered') return 3;
-    if (workOrder.status === 'accepted' && locationUpdates.length > 0) return 2;
+    if (workOrder.status === 'in_transit') return 2;
     if (workOrder.status === 'accepted') return 1;
     if (workOrder.status === 'assigned') return 0;
     return -1;
@@ -338,7 +368,31 @@ const TrackingModal = ({ workOrder, isOpen, onClose }: TrackingModalProps) => {
               </Card>
             )}
 
+            {workOrder.status === 'assigned' && (
+              <Button
+                className="w-full"
+                variant="secondary"
+                onClick={handleAccept}
+                loading={loading}
+              >
+                <Check size={16} className="mr-1" />
+                司机已接单
+              </Button>
+            )}
+
             {workOrder.status === 'accepted' && (
+              <Button
+                className="w-full"
+                variant="primary"
+                onClick={handleStartTransit}
+                loading={loading}
+              >
+                <Truck size={16} className="mr-1" />
+                开始配送
+              </Button>
+            )}
+
+            {(workOrder.status === 'accepted' || workOrder.status === 'in_transit') && (
               <Button
                 className="w-full"
                 variant="success"
@@ -428,8 +482,8 @@ const Logistics = () => {
 
   const formatCurrency = (amount: number) => `¥${amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
 
-  const deliveringCount = workOrders.filter(w => w.status === 'accepted').length;
-  const timeoutCount = workOrders.filter(w => w.status === 'accepted').length;
+  const deliveringCount = workOrders.filter(w => w.status === 'accepted' || w.status === 'in_transit').length;
+  const timeoutCount = workOrders.filter(w => w.status === 'in_transit').length;
 
   return (
     <div className="space-y-6">
@@ -463,7 +517,7 @@ const Logistics = () => {
           <div className="p-4">
             <p className="text-sm text-secondary-500 mb-1">配送中</p>
             <p className="text-2xl font-bold text-primary-600 font-serif">
-              {deliveringCount}
+              {workOrders.filter(w => w.status === 'accepted' || w.status === 'in_transit').length}
             </p>
           </div>
         </Card>
@@ -589,6 +643,7 @@ const Logistics = () => {
         workOrder={trackingModal.workOrder}
         isOpen={trackingModal.isOpen}
         onClose={() => setTrackingModal({ isOpen: false, workOrder: null })}
+        onRefresh={fetchWorkOrders}
       />
     </div>
   );

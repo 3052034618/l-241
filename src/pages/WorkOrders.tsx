@@ -16,7 +16,8 @@ const statusOptions = [
   { value: '', label: '全部状态' },
   { value: 'created', label: '待指派' },
   { value: 'assigned', label: '待接单' },
-  { value: 'accepted', label: '配送中' },
+  { value: 'accepted', label: '已接单' },
+  { value: 'in_transit', label: '配送中' },
   { value: 'delivered', label: '已送达' },
   { value: 'completed', label: '已完成' },
 ];
@@ -25,6 +26,7 @@ const statusColors: Record<string, string> = {
   created: 'bg-warning-100 text-warning-700',
   assigned: 'bg-info-100 text-info-700',
   accepted: 'bg-primary-100 text-primary-700',
+  in_transit: 'bg-primary-100 text-primary-700',
   delivered: 'bg-success-100 text-success-700',
   completed: 'bg-secondary-100 text-secondary-700',
 };
@@ -32,7 +34,8 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   created: '待指派',
   assigned: '待接单',
-  accepted: '配送中',
+  accepted: '已接单',
+  in_transit: '配送中',
   delivered: '已送达',
   completed: '已完成',
 };
@@ -100,6 +103,27 @@ const WorkOrders = () => {
     }
   };
 
+  const handleAccept = async (id: string) => {
+    const response = await api.put(`/workorders/${id}/accept`);
+    if (response.success) {
+      fetchWorkOrders();
+    }
+  };
+
+  const handleStartTransit = async (id: string) => {
+    const response = await api.put(`/workorders/${id}/start-transit`);
+    if (response.success) {
+      fetchWorkOrders();
+    }
+  };
+
+  const handleDelivered = async (id: string) => {
+    const response = await api.put(`/workorders/${id}/delivered`);
+    if (response.success) {
+      fetchWorkOrders();
+    }
+  };
+
   const openAssignModal = (workOrder: WorkOrder) => {
     setSelectedWorkOrder(workOrder);
     fetchCarriers();
@@ -109,7 +133,7 @@ const WorkOrders = () => {
   const formatCurrency = (amount: number) => `¥${amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
 
   const pendingCount = workOrders.filter(w => w.status === 'created' || w.status === 'assigned').length;
-  const deliveringCount = workOrders.filter(w => w.status === 'accepted').length;
+  const deliveringCount = workOrders.filter(w => w.status === 'accepted' || w.status === 'in_transit').length;
 
   return (
     <div className="space-y-6">
@@ -157,7 +181,7 @@ const WorkOrders = () => {
           <div className="p-4">
             <p className="text-sm text-secondary-500 mb-1">配送中</p>
             <p className="text-2xl font-bold text-primary-600 font-serif">
-              {workOrders.filter(w => w.status === 'accepted').length}
+              {workOrders.filter(w => w.status === 'accepted' || w.status === 'in_transit').length}
             </p>
           </div>
         </Card>
@@ -273,6 +297,36 @@ const WorkOrders = () => {
                         >
                           <Truck size={14} className="mr-1" />
                           指派承运
+                        </Button>
+                      )}
+                      {wo.status === 'assigned' && canAssign && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleAccept(wo.id)}
+                        >
+                          <Check size={14} className="mr-1" />
+                          司机接单
+                        </Button>
+                      )}
+                      {wo.status === 'accepted' && canAssign && (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() => handleStartTransit(wo.id)}
+                        >
+                          <Truck size={14} className="mr-1" />
+                          开始配送
+                        </Button>
+                      )}
+                      {wo.status === 'in_transit' && canAssign && (
+                        <Button
+                          size="sm"
+                          variant="success"
+                          onClick={() => handleDelivered(wo.id)}
+                        >
+                          <Package size={14} className="mr-1" />
+                          确认送达
                         </Button>
                       )}
                       {wo.status === 'delivered' && canAssign && (

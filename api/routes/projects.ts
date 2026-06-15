@@ -19,7 +19,7 @@ router.get(
   requireRoles(['project_admin', 'foundation_admin']),
   (req: Request, res: Response) => {
     const store = getStore();
-    const { status, type } = req.query;
+    const { status, type, search } = req.query;
 
     let projects = [...store.projects];
 
@@ -28,6 +28,14 @@ router.get(
     }
     if (type) {
       projects = projects.filter(p => p.type === type);
+    }
+    if (search) {
+      const q = String(search).toLowerCase();
+      projects = projects.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.managerName?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q)
+      );
     }
 
     projects.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

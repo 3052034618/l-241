@@ -248,7 +248,8 @@ const Applications = () => {
   }>({ isOpen: false, application: null, level: 'first' });
   const [recommendedPlan, setRecommendedPlan] = useState<MaterialPlanItem[] | null>(null);
   const [generatingPlan, setGeneratingPlan] = useState(false);
-  const [tempAppId, setTempAppId] = useState<string>('');
+  const [savedApplicationId, setSavedApplicationId] = useState<string>('');
+  const [savedApplication, setSavedApplication] = useState<AssistanceApplication | null>(null);
   const [newApplication, setNewApplication] = useState<Partial<AssistanceApplication>>({
     applicantName: '',
     phone: '',
@@ -282,23 +283,25 @@ const Applications = () => {
     fetchApplications();
   }, [search, status]);
 
-  const generateRecommendation = async () => {
-    if (!newApplication.urgencyLevel || !newApplication.needs) return;
-    
-    setGeneratingPlan(true);
-    const response = await api.post<{ application: AssistanceApplication; recommendedPlan: MaterialPlanItem[] }>(
-      `/applications/${tempAppId}/recommend`,
-      {}
-    );
-    
-    if (response.success && response.data) {
-      setRecommendedPlan(response.data.recommendedPlan);
-    }
-    setGeneratingPlan(false);
+  const resetAddForm = () => {
+    setAddModalOpen(false);
+    setRecommendedPlan(null);
+    setSavedApplicationId('');
+    setSavedApplication(null);
+    setNewApplication({
+      applicantName: '',
+      phone: '',
+      address: '',
+      familyMembers: 1,
+      familyIncome: 0,
+      urgencyLevel: 'medium',
+      needs: '',
+      specialSituation: '',
+      idCard: '',
+    });
   };
 
-  const handleAddSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveDraft = async () => {
     setSubmitting(true);
 
     const submitData = {
@@ -310,33 +313,35 @@ const Applications = () => {
     const response = await api.post<AssistanceApplication>('/applications', submitData);
     
     if (response.success && response.data) {
-      const appId = response.data.id;
-      setTempAppId(appId);
+      setSavedApplicationId(response.data.id);
+      setSavedApplication(response.data);
+    }
+    setSubmitting(false);
+  };
 
-      const recommendResponse = await api.post<{ application: AssistanceApplication; recommendedPlan: MaterialPlanItem[] }>(
-        `/applications/${appId}/recommend`,
-        {}
-      );
-      
-      if (recommendResponse.success && recommendResponse.data) {
-        setRecommendedPlan(recommendResponse.data.recommendedPlan);
-      }
+  const generateRecommendation = async () => {
+    if (!savedApplicationId) return;
+    
+    setGeneratingPlan(true);
+    const response = await api.post<{ application: AssistanceApplication; recommendedPlan: MaterialPlanItem[] }>(
+      `/applications/${savedApplicationId}/recommend`,
+      {}
+    );
+    
+    if (response.success && response.data) {
+      setRecommendedPlan(response.data.recommendedPlan);
+      setSavedApplication(response.data.application);
+    }
+    setGeneratingPlan(false);
+  };
 
-      setAddModalOpen(false);
+  const handleSubmitToReview = async () => {
+    if (!savedApplicationId) return;
+    setSubmitting(true);
+    const response = await api.post<AssistanceApplication>(`/applications/${savedApplicationId}/first-review`, { approved: true, comment: '提交初审' });
+    if (response.success) {
+      resetAddForm();
       fetchApplications();
-      setNewApplication({
-        applicantName: '',
-        phone: '',
-        address: '',
-        familyMembers: 1,
-        familyIncome: 0,
-        urgencyLevel: 'medium',
-        needs: '',
-        specialSituation: '',
-        idCard: '',
-      });
-      setRecommendedPlan(null);
-      setTempAppId('');
     }
     setSubmitting(false);
   };
@@ -527,14 +532,11 @@ const Applications = () => {
 
       <Modal
         isOpen={addModalOpen}
-        onClose={() => {
-          setAddModalOpen(false);
-          setRecommendedPlan(null);
-        }}
+        onClose={resetAddForm}
         title="新增受助申请"
         size="lg"
       >
-        <form onSubmit={handleAddSubmit} className="space-y-5">
+        <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Input
@@ -543,6 +545,7 @@ const Applications = () => {
                 onChange={(e) => setNewApplication({ ...newApplication, applicantName: e.target.value })}
                 placeholder="请输入姓名"
                 required
+                disabled={!!savedApplicationId}
               />
             </div>
             <div>
@@ -552,6 +555,7 @@ const Applications = () => {
                 onChange={(e) => setNewApplication({ ...newApplication, phone: e.target.value })}
                 placeholder="请输入手机号码"
                 required
+                disabled={!!savedApplicationId}
               />
             </div>
             <div>
@@ -561,6 +565,7 @@ const Applications = () => {
                 onChange={(e) => setNewApplication({ ...newApplication, idCard: e.target.value })}
                 placeholder="请输入身份证号"
                 required
+                disabled={!!savedApplicationId}
               />
             </div>
             <div className="col-span-2">
@@ -571,6 +576,7 @@ const Applications = () => {
                 placeholder="请输入详细地址"
                 icon={<MapPin size={16} className="text-secondary-400" />}
                 required
+                disabled={!!savedApplicationId}
               />
             </div>
             <div>
@@ -582,6 +588,7 @@ const Applications = () => {
                 onChange={(e) => setNewApplication({ ...newApplication, familyMembers: parseInt(e.target.value) || 1 })}
                 icon={<Users size={16} className="text-secondary-400" />}
                 required
+                disabled={!!savedApplicationId}
               />
             </div>
             <div>
@@ -592,6 +599,7 @@ const Applications = () => {
                 value={newApplication.familyIncome}
                 onChange={(e) => setNewApplication({ ...newApplication, familyIncome: parseInt(e.target.value) || 0 })}
                 required
+                disabled={!!savedApplicationId}
               />
             </div>
             <div>
@@ -601,6 +609,7 @@ const Applications = () => {
                 onChange={(e) => setNewApplication({ ...newApplication, urgencyLevel: e.target.value as any })}
                 options={urgencyOptions}
                 required
+                disabled={!!savedApplicationId}
               />
             </div>
           </div>
@@ -613,9 +622,10 @@ const Applications = () => {
               value={newApplication.needs}
               onChange={(e) => setNewApplication({ ...newApplication, needs: e.target.value })}
               placeholder="请详细描述家庭困难情况和具体需求..."
-              className="w-full px-4 py-3 rounded-lg border border-secondary-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all resize-none"
+              className="w-full px-4 py-3 rounded-lg border border-secondary-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all resize-none disabled:bg-secondary-50"
               rows={3}
               required
+              disabled={!!savedApplicationId}
             />
           </div>
 
@@ -625,20 +635,39 @@ const Applications = () => {
               value={newApplication.specialSituation}
               onChange={(e) => setNewApplication({ ...newApplication, specialSituation: e.target.value })}
               placeholder="如：过敏史、慢性病、行动不便等"
+              disabled={!!savedApplicationId}
             />
           </div>
 
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full"
-            onClick={generateRecommendation}
-            loading={generatingPlan}
-            disabled={!newApplication.urgencyLevel || !newApplication.needs || !tempAppId}
-          >
-            <Sparkles size={16} className="mr-1" />
-            智能推荐物资方案（请先保存草稿）
-          </Button>
+          {!savedApplicationId ? (
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              onClick={handleSaveDraft}
+              loading={submitting}
+              disabled={!newApplication.applicantName || !newApplication.phone || !newApplication.needs}
+            >
+              第一步：保存申请
+            </Button>
+          ) : (
+            <>
+              <div className="bg-success-50 border border-success-200 rounded-lg p-3 text-sm text-success-700">
+                ✓ 申请已保存，申请编号：{savedApplicationId}
+              </div>
+
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                onClick={generateRecommendation}
+                loading={generatingPlan}
+              >
+                <Sparkles size={16} className="mr-1" />
+                第二步：生成推荐方案
+              </Button>
+            </>
+          )}
 
           {recommendedPlan && recommendedPlan.length > 0 && (
             <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
@@ -687,18 +716,20 @@ const Applications = () => {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => {
-                setAddModalOpen(false);
-                setRecommendedPlan(null);
-              }}
+              onClick={resetAddForm}
             >
               取消
             </Button>
-            <Button type="submit" loading={submitting}>
-              提交申请
+            <Button
+              type="button"
+              loading={submitting}
+              disabled={!savedApplicationId || !recommendedPlan || recommendedPlan.length === 0}
+              onClick={handleSubmitToReview}
+            >
+              第三步：提交审批
             </Button>
           </div>
-        </form>
+        </div>
       </Modal>
 
       <ReviewModal

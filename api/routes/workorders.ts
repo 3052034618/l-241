@@ -110,6 +110,29 @@ router.put(
 );
 
 router.put(
+  '/:id/start-transit',
+  authenticate,
+  (req: Request<{ id: string }, ApiResponse<WorkOrder>>, res: Response) => {
+    const store = getStore();
+    const workOrder = store.workOrders.find(w => w.id === req.params.id);
+
+    if (!workOrder) {
+      res.status(404).json({ success: false, message: '工单不存在' });
+      return;
+    }
+
+    if (workOrder.status !== 'accepted') {
+      res.status(400).json({ success: false, message: '当前状态不允许开始配送' });
+      return;
+    }
+
+    workOrder.status = 'in_transit';
+
+    res.json({ success: true, data: workOrder, message: '已开始配送' });
+  }
+);
+
+router.put(
   '/:id/delivered',
   authenticate,
   (req: Request<{ id: string }, ApiResponse<WorkOrder>>, res: Response) => {
@@ -191,7 +214,12 @@ router.get(
         { location: '目的地附近', status: '已到达', lat: 39.9342, lng: 116.3574 },
       ];
 
-      const numUpdates = workOrder.status === 'delivered' ? 5 : Math.min(3, baseLocations.length);
+      let numUpdates = 1;
+      if (workOrder.status === 'delivered') numUpdates = 5;
+      else if (workOrder.status === 'in_transit') numUpdates = 4;
+      else if (workOrder.status === 'accepted') numUpdates = 2;
+      else if (workOrder.status === 'assigned') numUpdates = 1;
+
       const startTime = new Date(workOrder.createdAt);
       startTime.setHours(startTime.getHours() + 1);
 

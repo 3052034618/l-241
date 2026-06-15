@@ -90,7 +90,7 @@ router.post(
       projectId: project?.id,
       projectName: project?.name,
       receiptNo,
-      status: 'completed',
+      status: 'approved',
       createdAt: new Date().toISOString(),
     };
 

@@ -13,7 +13,7 @@ export interface User {
 }
 
 export type DonationType = 'money' | 'goods';
-export type DonationStatus = 'completed' | 'pending' | 'cancelled';
+export type DonationStatus = 'approved' | 'pending' | 'rejected';
 
 export interface DonationGood {
   name: string;
